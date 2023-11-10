@@ -10,7 +10,7 @@ from . import (DOMAIN, BASE_URL, GROHE_SENSE_TYPE, GROHE_SENSE_GUARD_TYPE)
 
 _LOGGER = logging.getLogger(__name__)
 
-VALVE_UPDATE_DELAY = timedelta(minutes=1)
+VALVE_UPDATE_DELAY = timedelta(minutes=10)
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     _LOGGER.debug("Starting Grohe Sense valve switch")

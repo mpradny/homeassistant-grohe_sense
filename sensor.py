@@ -30,7 +30,7 @@ SENSOR_TYPES_PER_UNIT = {
         GROHE_SENSE_GUARD_TYPE: [ 'flowrate', 'pressure', 'temperature_guard']
         }
 
-NOTIFICATION_UPDATE_DELAY = timedelta(minutes=1)
+NOTIFICATION_UPDATE_DELAY = timedelta(minutes=10)
 
 NOTIFICATION_TYPES = { # The protocol returns notification information as a (category, type) tuple, this maps to strings
         (10,60) : 'Firmware update available',
@@ -104,35 +104,31 @@ class GroheSenseGuardReader:
 
         # XXX: Hardcoded 15 minute interval for now. Would be prettier to set this a bit more dynamically
         # based on the json response for the sense guard, and probably hardcode something longer for the sense.
-        if datetime.now() - self._data_fetch_completed < timedelta(minutes=15):
+        if datetime.now() - self._data_fetch_completed < timedelta(minutes=60):
             _LOGGER.debug('Skipping fetching new data, time since last fetch was only %s', datetime.now() - self._data_fetch_completed)
             return
 
         _LOGGER.debug("Fetching new data for appliance %s", self._applianceId)
         self._fetching_data = asyncio.Event()
 
-        def parse_time(s):
-            # XXX: Fix for python 3.6 - Grohe emits time zone as "+HH:MM", python 3.6's %z only accepts the format +HHMM
-            # So, some ugly code to remove the colon for now...
-            if s.rfind(':') > s.find('+'):
-                s = s[:s.rfind(':')] + s[s.rfind(':')+1:]
-            return datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%f%z')
+        def parse_time(s):            
+            return datetime.strptime(s, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
 
         poll_from=self._poll_from.strftime('%Y-%m-%d')
-        measurements_response = await self._auth_session.get(BASE_URL + f'locations/{self._locationId}/rooms/{self._roomId}/appliances/{self._applianceId}/data/aggregated?from={poll_from}')
+        measurements_response = await self._auth_session.get(BASE_URL + f'locations/{self._locationId}/rooms/{self._roomId}/appliances/{self._applianceId}/data/aggregated?groupBy=hour&from={poll_from}')
         _LOGGER.debug('Data read: %s', measurements_response['data'])
         if 'withdrawals' in measurements_response['data']:
             withdrawals = measurements_response['data']['withdrawals']
             _LOGGER.debug('Received %d withdrawals in response', len(withdrawals))
             for w in withdrawals:
-                w['starttime'] = parse_time(w['starttime'])
-            withdrawals = [ w for w in withdrawals if w['starttime'] > self._poll_from]
-            withdrawals.sort(key = lambda x: x['starttime'])
+                w['date'] = parse_time(w['date'])
+            withdrawals = [ w for w in withdrawals if w['date'] > self._poll_from]
+            withdrawals.sort(key = lambda x: x['date'])
 
             _LOGGER.debug('Got %d new withdrawals totaling %f volume', len(withdrawals), sum((w['waterconsumption'] for w in withdrawals)))
             self._withdrawals += withdrawals
             if len(self._withdrawals) > 0:
-                self._poll_from = max(self._poll_from, self._withdrawals[-1]['starttime'])
+                self._poll_from = max(self._poll_from, self._withdrawals[-1]['date'])
         elif self._type != GROHE_SENSE_TYPE:
             _LOGGER.info('Data response for appliance %s did not contain any withdrawals data', self._applianceId)
 
@@ -144,7 +140,7 @@ class GroheSenseGuardReader:
                     _LOGGER.debug('key: %s', key)
                     if key in measurements[-1]:
                         self._measurements[key] = measurements[-1][key]
-                self._poll_from = datetime.strptime(measurements[-1]['date'], '%Y-%m-%d')
+                self._poll_from = datetime.strptime(measurements[-1]['date'], '%Y-%m-%d %H:%M:%S')
         else:
             _LOGGER.info('Data response for appliance %s did not contain any measurements data', self._applianceId)
 
@@ -157,7 +153,7 @@ class GroheSenseGuardReader:
     def consumption(self, since):
         # XXX: As self._withdrawals is sorted, we could speed this up by a binary search,
         #      but most likely data sets are small enough that a linear scan is fine.
-        return sum((w['waterconsumption'] for w in self._withdrawals if w['starttime'] >= since))
+        return sum((w['waterconsumption'] for w in self._withdrawals if w['date'] >= since))
 
     def measurement(self, key):
         if key in self._measurements:
