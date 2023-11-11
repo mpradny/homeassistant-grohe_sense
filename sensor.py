@@ -5,7 +5,7 @@ from datetime import (datetime, timezone, timedelta)
 
 from homeassistant.helpers.entity import Entity
 from homeassistant.util import Throttle
-from homeassistant.const import (STATE_UNAVAILABLE, STATE_UNKNOWN, TEMP_CELSIUS, DEVICE_CLASS_TEMPERATURE, PERCENTAGE, DEVICE_CLASS_HUMIDITY, VOLUME_FLOW_RATE_CUBIC_METERS_PER_HOUR, PRESSURE_BAR, DEVICE_CLASS_PRESSURE, TEMP_CELSIUS, DEVICE_CLASS_TEMPERATURE, VOLUME_LITERS)
+from homeassistant.const import (STATE_UNAVAILABLE, STATE_UNKNOWN, STATE_OK, TEMP_CELSIUS, DEVICE_CLASS_TEMPERATURE, PERCENTAGE, DEVICE_CLASS_HUMIDITY, VOLUME_FLOW_RATE_CUBIC_METERS_PER_HOUR, PRESSURE_BAR, DEVICE_CLASS_PRESSURE, TEMP_CELSIUS, DEVICE_CLASS_TEMPERATURE, VOLUME_LITERS)
 
 from homeassistant.helpers import aiohttp_client
 
@@ -29,6 +29,8 @@ SENSOR_TYPES_PER_UNIT = {
         GROHE_SENSE_TYPE: [ 'temperature', 'humidity'],
         GROHE_SENSE_GUARD_TYPE: [ 'flowrate', 'pressure', 'temperature_guard']
         }
+
+UPDATE_DELAY = timedelta(minutes=60)
 
 NOTIFICATION_UPDATE_DELAY = timedelta(minutes=10)
 
@@ -161,7 +163,12 @@ class GroheSenseGuardReader:
         if key in self._measurements:
             return self._measurements[key]
         return STATE_UNKNOWN
-
+    
+    def state(self):
+        if len(self._measurements):
+          return STATE_OK
+        else:
+          return STATE_UNAVAILABLE
 
 class GroheSenseNotificationEntity(Entity):
     def __init__(self, auth_session, locationId, roomId, applianceId, name):
@@ -209,15 +216,17 @@ class GroheSenseGuardWithdrawalsEntity(Entity):
 
     @property
     def state(self):
-        raw_state = self._reader.measurement(self._key)
+        raw_state = self._reader.state()
         if raw_state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
             return raw_state
+        
         if self._days == 1: # special case, if we're averaging over 1 day, just count since midnight local time
             since = datetime.now().astimezone().replace(hour=0,minute=0,second=0,microsecond=0)
         else: # otherwise, it's a rolling X day average
             since = datetime.now(tz=timezone.utc) - timedelta(self._days)
         return self._reader.consumption(since)
 
+    @Throttle(UPDATE_DELAY)
     async def async_update(self):
         await self._reader.async_update()
 
