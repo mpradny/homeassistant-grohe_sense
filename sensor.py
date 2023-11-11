@@ -88,7 +88,7 @@ class GroheSenseGuardReader:
         self._applianceId = applianceId
         self._type = device_type
 
-        self._withdrawals = []
+        self._withdrawals = {}
         self._measurements = {}
         self._poll_from = datetime.now(tz=timezone.utc) - timedelta(7)
         self._fetching_data = None
@@ -106,7 +106,7 @@ class GroheSenseGuardReader:
 
         # XXX: Hardcoded 15 minute interval for now. Would be prettier to set this a bit more dynamically
         # based on the json response for the sense guard, and probably hardcode something longer for the sense.
-        if datetime.now() - self._data_fetch_completed < timedelta(minutes=60):
+        if datetime.now() - self._data_fetch_completed < timedelta(minutes=10):
             _LOGGER.debug('Skipping fetching new data, time since last fetch was only %s', datetime.now() - self._data_fetch_completed)
             return
 
@@ -124,13 +124,19 @@ class GroheSenseGuardReader:
             _LOGGER.debug('Received %d withdrawals in response', len(withdrawals))
             for w in withdrawals:
                 w['date'] = parse_time(w['date'])
-            withdrawals = [ w for w in withdrawals if w['date'] > self._poll_from]
-            withdrawals.sort(key = lambda x: x['date'])
+            withdrawals = [ w for w in withdrawals if w['date'] >= self._poll_from]
+            
+            withdrawals_dict = {w['date']: w for w in withdrawals}
 
             _LOGGER.debug('Got %d new withdrawals totaling %f volume', len(withdrawals), sum((w['waterconsumption'] for w in withdrawals)))
-            self._withdrawals += withdrawals
-            if len(self._withdrawals) > 0:
-                self._poll_from = max(self._poll_from, self._withdrawals[-1]['date'])
+            
+            for date, withdrawal in withdrawals_dict.items():
+                self._withdrawals[date] = withdrawal
+
+             # If we have new withdrawals, update poll_from to the latest date
+            if withdrawals_dict:
+                self._poll_from = max(self._poll_from, max(withdrawals_dict.keys()))
+                
         elif self._type != GROHE_SENSE_TYPE:
             _LOGGER.info('Data response for appliance %s did not contain any withdrawals data', self._applianceId)
 
@@ -156,8 +162,8 @@ class GroheSenseGuardReader:
 
     def consumption(self, since):
         # XXX: As self._withdrawals is sorted, we could speed this up by a binary search,
-        #      but most likely data sets are small enough that a linear scan is fine.
-        return sum((w['waterconsumption'] for w in self._withdrawals if w['date'] >= since))
+        #      but most likely data sets are small enough that a linear scan is fine.        
+        return sum(w['waterconsumption'] for date, w in self._withdrawals.items() if date >= since)
 
     def measurement(self, key):
         if key in self._measurements:
