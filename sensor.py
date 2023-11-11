@@ -114,7 +114,7 @@ class GroheSenseGuardReader:
         def parse_time(s):            
             return datetime.strptime(s, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
 
-        poll_from=self._poll_from.strftime('%Y-%m-%d')
+        poll_from=self._poll_from.strftime('%Y-%m-%d %H:%M:%S')
         measurements_response = await self._auth_session.get(BASE_URL + f'locations/{self._locationId}/rooms/{self._roomId}/appliances/{self._applianceId}/data/aggregated?groupBy=hour&from={poll_from}')
         _LOGGER.debug('Data read: %s', measurements_response['data'])
         if 'withdrawals' in measurements_response['data']:
@@ -134,13 +134,15 @@ class GroheSenseGuardReader:
 
         if 'measurement' in measurements_response['data']:
             measurements = measurements_response['data']['measurement']
+            for m in measurements:
+                m['date'] = parse_time(m['date'])
             measurements.sort(key = lambda x: x['date'])
             if len(measurements):
                 for key in SENSOR_TYPES_PER_UNIT[self._type]:
                     _LOGGER.debug('key: %s', key)
                     if key in measurements[-1]:
                         self._measurements[key] = measurements[-1][key]
-                self._poll_from = datetime.strptime(measurements[-1]['date'], '%Y-%m-%d %H:%M:%S')
+                self._poll_from = max(self._poll_from,measurements[-1]['date'])
         else:
             _LOGGER.info('Data response for appliance %s did not contain any measurements data', self._applianceId)
 
@@ -207,6 +209,9 @@ class GroheSenseGuardWithdrawalsEntity(Entity):
 
     @property
     def state(self):
+        raw_state = self._reader.measurement(self._key)
+        if raw_state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+            return raw_state
         if self._days == 1: # special case, if we're averaging over 1 day, just count since midnight local time
             since = datetime.now().astimezone().replace(hour=0,minute=0,second=0,microsecond=0)
         else: # otherwise, it's a rolling X day average
