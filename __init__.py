@@ -101,8 +101,7 @@ async def initialize_shared_objects(hass, username, password):
                 _LOGGER.debug('Found appliance %s', appliance)
                 applianceId = appliance['appliance_id']
                 devices.append(GroheDevice(locationId, roomId, applianceId, appliance['type'], appliance['name'], applianceId))
-                device_registry.async_get_or_create(
-                    config_entry_id=applianceId,                    
+                device_registry.async_get_or_create(                                    
                     identifiers={(DOMAIN, applianceId)},
                     manufacturer="Grohe Sense",                    
                     name=appliance['name'],
