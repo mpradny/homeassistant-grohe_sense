@@ -73,8 +73,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         if device.type in SENSOR_TYPES_PER_UNIT:
             entities += [GroheSenseSensorEntity(reader, device.name, key) for key in SENSOR_TYPES_PER_UNIT[device.type]]
             if device.type == GROHE_SENSE_GUARD_TYPE: # The sense guard also gets sensor entities for water flow
-                entities.append(GroheSenseGuardWithdrawalsEntity(reader, device.name, 1))
-                entities.append(GroheSenseGuardWithdrawalsEntity(reader, device.name, 7))
+                entities.append(GroheSenseGuardWithdrawalsEntity(reader, device.name, 1))  
         else:
             _LOGGER.warning('Unrecognized appliance %s, ignoring.', device)
     if entities:
@@ -90,7 +89,7 @@ class GroheSenseGuardReader:
 
         self._withdrawals = {}
         self._measurements = {}
-        self._poll_from = datetime.now(tz=timezone.utc) - timedelta(7)
+        self._poll_from = datetime.now(tz=timezone.utc) - timedelta(1)
         self._fetching_data = None
         self._data_fetch_completed = datetime.min
 
