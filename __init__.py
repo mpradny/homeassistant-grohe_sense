@@ -6,9 +6,11 @@ from lxml import html
 import json
 
 import homeassistant.helpers.config_validation as cv
+
 import voluptuous as vol
 
 from homeassistant.helpers import aiohttp_client
+from homeassistant.helpers import device_registry as dr
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,6 +81,7 @@ async def async_setup(hass, config):
     return True
 
 async def initialize_shared_objects(hass, username, password):
+    device_registry = dr.async_get(hass)
     session = aiohttp_client.async_get_clientsession(hass)
     auth_session = OauthSession(session, username, password, await get_token(session, username, password))
     devices = []
@@ -98,6 +101,12 @@ async def initialize_shared_objects(hass, username, password):
                 _LOGGER.debug('Found appliance %s', appliance)
                 applianceId = appliance['appliance_id']
                 devices.append(GroheDevice(locationId, roomId, applianceId, appliance['type'], appliance['name'], applianceId))
+                device_registry.async_get_or_create(                                    
+                    identifiers={(DOMAIN, applianceId)},
+                    manufacturer="Grohe Sense",                    
+                    name=appliance['name'],
+                    model=appliance['type'],
+                )
 
 class OauthException(Exception):
     def __init__(self, error_code, reason):
