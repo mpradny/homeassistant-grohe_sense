@@ -71,7 +71,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         reader = GroheSenseGuardReader(auth_session, device.locationId, device.roomId, device.applianceId, device.type)
         entities.append(GroheSenseNotificationEntity(auth_session, device.locationId, device.roomId, device.applianceId, device.name))
         if device.type in SENSOR_TYPES_PER_UNIT:
-            entities += [GroheSenseSensorEntity(reader, device.name, key) for key in SENSOR_TYPES_PER_UNIT[device.type]]
+            entities += [GroheSenseSensorEntity(reader, device, key) for key in SENSOR_TYPES_PER_UNIT[device.type]]
             if device.type == GROHE_SENSE_GUARD_TYPE: # The sense guard also gets sensor entities for water flow
                 entities.append(GroheSenseGuardWithdrawalsEntity(reader, device, 1))  
         else:
@@ -210,15 +210,14 @@ class GroheSenseGuardWithdrawalsEntity(Entity):
 
     @property
     def unique_id(self):
-        return '{}-{}'.format(self._reader.applianceId, self._days)
+        return '{}-{}'.format(self.device.unique_id, self._days)
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers = {(DOMAIN, self.device.unique_id)},
-            name = self.device.name,            
-            model = self.device.type            
-        )
+        return {
+            "identifiers": {(DOMAIN, self.device.unique_id)},
+            "name": self.device.name,            
+        }
     
     @property
     def name(self):
@@ -245,11 +244,23 @@ class GroheSenseGuardWithdrawalsEntity(Entity):
         await self._reader.async_update()
 
 class GroheSenseSensorEntity(Entity):
-    def __init__(self, reader, name, key):
+    def __init__(self, reader, device, key):
         self._reader = reader
-        self._name = name
+        self._name = device.name
         self._key = key
+        self.device = device
 
+    @property
+    def unique_id(self):
+        return '{}-{}'.format(self.device.unique_id, self._key)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return {
+            "identifiers": {(DOMAIN, self.device.unique_id)},
+            "name": self.device.name,            
+        }
+    
     @property
     def name(self):
         return '{} {}'.format(self._name, self._key)
