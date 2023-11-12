@@ -3,7 +3,7 @@ import asyncio
 import collections
 from datetime import (datetime, timezone, timedelta)
 
-from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.util import Throttle
 from homeassistant.const import (STATE_UNAVAILABLE, STATE_UNKNOWN, STATE_OK, TEMP_CELSIUS, DEVICE_CLASS_TEMPERATURE, PERCENTAGE, DEVICE_CLASS_HUMIDITY, VOLUME_FLOW_RATE_CUBIC_METERS_PER_HOUR, PRESSURE_BAR, DEVICE_CLASS_PRESSURE, TEMP_CELSIUS, DEVICE_CLASS_TEMPERATURE, VOLUME_LITERS)
 
@@ -211,6 +211,16 @@ class GroheSenseGuardWithdrawalsEntity(Entity):
     #def unique_id(self):
     #    return '{}-{}'.format(self._reader.applianceId, self._days)
 
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._reader.applianceId)},
+            name="Grohe Sense",
+            manufacturer="Grohe",
+            model="Grohe Sense",
+            sw_version="0.0.1"
+        )
+    
     @property
     def name(self):
         return '{} {} day'.format(self._name, self._days)
