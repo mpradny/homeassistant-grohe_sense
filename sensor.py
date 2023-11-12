@@ -73,7 +73,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         if device.type in SENSOR_TYPES_PER_UNIT:
             entities += [GroheSenseSensorEntity(reader, device.name, key) for key in SENSOR_TYPES_PER_UNIT[device.type]]
             if device.type == GROHE_SENSE_GUARD_TYPE: # The sense guard also gets sensor entities for water flow
-                entities.append(GroheSenseGuardWithdrawalsEntity(reader, device.name, 1))  
+                entities.append(GroheSenseGuardWithdrawalsEntity(reader, device, 1))  
         else:
             _LOGGER.warning('Unrecognized appliance %s, ignoring.', device)
     if entities:
@@ -202,23 +202,22 @@ class GroheSenseNotificationEntity(Entity):
 
 
 class GroheSenseGuardWithdrawalsEntity(Entity):
-    def __init__(self, reader, name, days):
+    def __init__(self, reader, device, days):
+        self.device = device
         self._reader = reader
-        self._name = name
+        self._name = device.name
         self._days = days
 
-    #@property
-    #def unique_id(self):
-    #    return '{}-{}'.format(self._reader.applianceId, self._days)
+    @property
+    def unique_id(self):
+        return '{}-{}'.format(self._reader.applianceId, self._days)
 
     @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
-            identifiers={(DOMAIN, self._reader.applianceId)},
-            name="Grohe Sense",
-            manufacturer="Grohe",
-            model="Grohe Sense",
-            sw_version="0.0.1"
+            "identifiers": {(DOMAIN, self.device.unique_id)},
+            "name": self.device.name,            
+            "model": self.device.type,            
         )
     
     @property

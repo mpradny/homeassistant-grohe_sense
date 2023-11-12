@@ -32,7 +32,7 @@ BASE_URL = 'https://idp2-apigw.cloud.grohe.com/v3/iot/'
 GROHE_SENSE_TYPE = 101 # Type identifier for the battery powered water detector
 GROHE_SENSE_GUARD_TYPE = 103 # Type identifier for sense guard, the water guard installed on your water pipe
 
-GroheDevice = collections.namedtuple('GroheDevice', ['locationId', 'roomId', 'applianceId', 'type', 'name'])
+GroheDevice = collections.namedtuple('GroheDevice', ['locationId', 'roomId', 'applianceId', 'type', 'name', 'unique_id'])
 
 async def get_token(session, username, password):
     try:
@@ -97,7 +97,7 @@ async def initialize_shared_objects(hass, username, password):
             for appliance in appliances:
                 _LOGGER.debug('Found appliance %s', appliance)
                 applianceId = appliance['appliance_id']
-                devices.append(GroheDevice(locationId, roomId, applianceId, appliance['type'], appliance['name']))
+                devices.append(GroheDevice(locationId, roomId, applianceId, appliance['type'], appliance['name'], applianceId))
 
 class OauthException(Exception):
     def __init__(self, error_code, reason):
