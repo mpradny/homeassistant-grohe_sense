@@ -215,9 +215,9 @@ class GroheSenseGuardWithdrawalsEntity(Entity):
     @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
-            "identifiers": {(DOMAIN, self.device.unique_id)},
-            "name": self.device.name,            
-            "model": self.device.type,            
+            identifiers = {(DOMAIN, self.device.unique_id)},
+            name = self.device.name,            
+            model = self.device.type            
         )
     
     @property
