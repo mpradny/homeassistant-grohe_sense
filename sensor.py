@@ -114,17 +114,16 @@ class GroheSenseGuardReader:
         self._fetching_data = asyncio.Event()
 
         def parse_time(s):            
-            return datetime.strptime(s, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
+            return datetime.strptime(s, '%Y-%m-%d').replace(tzinfo=timezone.utc)
 
-        poll_from=self._poll_from.strftime('%Y-%m-%d %H:%M:%S')
-        measurements_response = await self._auth_session.get(BASE_URL + f'locations/{self._locationId}/rooms/{self._roomId}/appliances/{self._applianceId}/data/aggregated?groupBy=hour&from={poll_from}')
+        poll_from=self._poll_from.strftime('%Y-%m-%d')
+        measurements_response = await self._auth_session.get(BASE_URL + f'locations/{self._locationId}/rooms/{self._roomId}/appliances/{self._applianceId}/data/aggregated?groupBy=day&from={poll_from}')
         _LOGGER.debug('Data read: %s', measurements_response['data'])
         if 'withdrawals' in measurements_response['data']:
             withdrawals = measurements_response['data']['withdrawals']
             _LOGGER.debug('Received %d withdrawals in response', len(withdrawals))
             for w in withdrawals:
                 w['date'] = parse_time(w['date'])
-            withdrawals = [ w for w in withdrawals if w['date'] >= self._poll_from]
             
             withdrawals_dict = {w['date']: w for w in withdrawals}
 
@@ -136,7 +135,7 @@ class GroheSenseGuardReader:
              # If we have new withdrawals, update poll_from to the latest date
             if withdrawals_dict:
                 self._poll_from = max(self._poll_from, max(withdrawals_dict.keys()))
-                
+
         elif self._type != GROHE_SENSE_TYPE:
             _LOGGER.info('Data response for appliance %s did not contain any withdrawals data', self._applianceId)
 
@@ -162,7 +161,8 @@ class GroheSenseGuardReader:
 
     def consumption(self, since):
         # XXX: As self._withdrawals is sorted, we could speed this up by a binary search,
-        #      but most likely data sets are small enough that a linear scan is fine.        
+        #      but most likely data sets are small enough that a linear scan is fine.   
+        _LOGGER.debug('Checking data since %s volume', since)     
         return sum(w['waterconsumption'] for date, w in self._withdrawals.items() if date >= since)
 
     def measurement(self, key):
