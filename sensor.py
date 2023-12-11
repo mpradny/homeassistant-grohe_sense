@@ -226,6 +226,10 @@ class GroheSenseGuardWithdrawalsEntity(Entity):
     @property
     def unit_of_measurement(self):
         return VOLUME_LITERS
+    
+    @property
+    def device_class(self):
+        return "water"
 
     @property
     def state(self):
